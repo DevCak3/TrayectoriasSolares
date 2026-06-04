@@ -2,6 +2,9 @@ import numpy as np
 import math
 import csv
 import os
+import requests
+from datetime import datetime
+from io import StringIO
 import pandas as pd
 
 # =============================================================================
@@ -153,7 +156,74 @@ def load_tmy(tmy_path: str = None) -> pd.DataFrame:
         tmy_path = os.path.join(base, "data", "nasa_power_hourly_CU_clean.csv")
 
     if not os.path.exists(tmy_path):
-        return None
+        # Intentar descargar automáticamente desde NASA POWER si no existe
+        try:
+            os.makedirs(os.path.dirname(tmy_path), exist_ok=True)
+            # Coordenadas por defecto (Ciudad Universitaria)
+            try:
+                lat = LATITUD
+                lon = -abs(LONGITUD)
+            except Exception:
+                lat = 19.32
+                lon = -99.18
+
+            API = 'https://power.larc.nasa.gov/api/temporal/hourly/point'
+            params = {
+                'parameters': 'ALLSKY_SFC_SW_DWN',
+                'community': 'RE',
+                'longitude': lon,
+                'latitude': lat,
+                'start': '20200101',
+                'end': '20201231',
+                'format': 'JSON'
+            }
+            r = requests.get(API, params=params, timeout=30)
+            r.raise_for_status()
+            data = r.json()
+            params_dict = data.get('properties', {}).get('parameter', {})
+            ghi_series = None
+            for key in ['ALLSKY_SFC_SW_DWN', 'GHI', 'ghi']:
+                if key in params_dict:
+                    ghi_series = params_dict[key]
+                    break
+            if ghi_series is None and len(params_dict) == 1:
+                ghi_series = list(params_dict.values())[0]
+
+            if ghi_series is not None:
+                rows = []
+                for ts, val in ghi_series.items():
+                    try:
+                        dt = datetime.strptime(ts, '%Y%m%d%H')
+                    except Exception:
+                        try:
+                            dt = pd.to_datetime(ts)
+                        except Exception:
+                            continue
+                    rows.append({'datetime': dt, 'GHI': val})
+                df = pd.DataFrame(rows).set_index('datetime').sort_index()
+                df.to_csv(tmy_path)
+            else:
+                # Fallback a CSV endpoint
+                params['format'] = 'CSV'
+                r2 = requests.get(API, params=params, timeout=30)
+                r2.raise_for_status()
+                text = r2.text
+                lines = [L for L in text.splitlines() if not L.strip().startswith('#')]
+                csv_text = '\n'.join(lines)
+                df2 = pd.read_csv(StringIO(csv_text))
+                for col in ['ALLSKY_SFC_SW_DWN', 'GHI', 'ghi']:
+                    if col in df2.columns:
+                        df2 = df2.rename(columns={col: 'GHI'})
+                        break
+                if 'YYYYMMDDHH' in df2.columns:
+                    df2['datetime'] = pd.to_datetime(df2['YYYYMMDDHH'], format='%Y%m%d%H')
+                    df2 = df2.set_index('datetime')
+                elif set(['Year','Month','Day','Hour']).issubset(df2.columns):
+                    df2['datetime'] = pd.to_datetime(df2[['Year','Month','Day','Hour']])
+                    df2 = df2.set_index('datetime')
+                df2.to_csv(tmy_path)
+        except Exception:
+            return None
 
     try:
         df = pd.read_csv(tmy_path, parse_dates=["datetime"], index_col="datetime")
