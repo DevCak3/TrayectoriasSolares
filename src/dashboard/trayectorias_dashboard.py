@@ -8,12 +8,10 @@ import sys
 from datetime import date, time as dt_time
 import time
 
-# Permitir importar utilidades del script principal
-BASE_DIR = os.path.normpath(r"C:\CODE\python\Solar_Irradiance_CU")
-SRC_DIR = os.path.join(BASE_DIR, "src")
-if SRC_DIR not in sys.path:
-    sys.path.insert(0, SRC_DIR)
-
+# Try to import utilities from project `src` directory. Prefer app-level sys.path
+# setup (app.py adds project/src to sys.path). If that fails, add a relative
+# path based on this file's location so the app works both locally and on
+# Streamlit Cloud.
 try:
     from Trayectorias_CU_CDMX import (
         calcular_trayectoria_horaria,
@@ -27,8 +25,26 @@ try:
         time_correction_minutes,
     )
 except Exception:
-    st.error("No se pudieron cargar las utilidades de Trayectorias_CU_CDMX.py. Ejecuta desde el workspace correcto.")
-    st.stop()
+    # Fallback: add project `src` relative to this file
+    THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+    PROJECT_SRC = os.path.abspath(os.path.join(THIS_DIR, ".."))
+    if PROJECT_SRC not in sys.path:
+        sys.path.insert(0, PROJECT_SRC)
+    try:
+        from Trayectorias_CU_CDMX import (
+            calcular_trayectoria_horaria,
+            declinacion,
+            angulo_amanecer,
+            altitud_solar,
+            azimut_solar,
+            angulo_incidencia,
+            load_tmy,
+            ghi_for_day_hour,
+            time_correction_minutes,
+        )
+    except Exception:
+        st.error("No se pudieron cargar las utilidades de Trayectorias_CU_CDMX.py. Ejecuta desde el workspace correcto.")
+        st.stop()
 
 st.set_page_config(page_title="Trayectorias Solar", layout="wide")
 st.title("Calculadora de Trayectorias Solares")
