@@ -15,6 +15,7 @@ envs/
 
 # Data and outputs
 data/
+!data/nasa_power_hourly_CU_clean.csv
 outputs/
 deploy_pipeline/data/
 
