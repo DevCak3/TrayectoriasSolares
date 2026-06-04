@@ -49,10 +49,22 @@ with st.sidebar:
 
 N = fecha.timetuple().tm_yday
 
-# Cargar TMY opcional
-tmy_df = load_tmy()
+# Cargar TMY opcional (mostrar progreso al descargar)
+tmy_df = None
+with st.spinner('Comprobando TMY local y descargando desde NASA POWER si es necesario...'):
+    try:
+        tmy_df = load_tmy()
+    except Exception as e:
+        tmy_df = None
+        st.error(f"Error al intentar cargar/descargar TMY: {e}")
+
 if tmy_df is None:
-    st.warning("TMY no encontrado; usando valores de respaldo para irradiancia.")
+    st.warning("TMY no encontrado o no disponible; usando valores de respaldo para irradiancia.")
+else:
+    try:
+        st.success(f"TMY cargado correctamente ({len(tmy_df)} filas).")
+    except Exception:
+        st.success("TMY cargado correctamente.")
 
 # Cálculos: usar la función del script para generar exactamente los puntos
 lat_rad = np.radians(lat)
