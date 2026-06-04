@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environments
+.env
+.venv/
+.venv_fix/
+
+# Conda environments
+miniforge/
+envs/
+
+# Data and outputs
+data/
+outputs/
+deploy_pipeline/data/
+
+# IDEs
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Ignore large/minified binaries
+*.pth
+
+# Keep deploy pipeline files but ignore generated data
+!deploy_pipeline/README.md
+!deploy_pipeline/app.py
+!deploy_pipeline/requirements.txt
+
