@@ -6,6 +6,7 @@ import math
 import os
 import sys
 from datetime import date, time as dt_time
+import time
 
 # Permitir importar utilidades del script principal
 BASE_DIR = os.path.normpath(r"C:\CODE\python\Solar_Irradiance_CU")
@@ -50,10 +51,39 @@ with st.sidebar:
 N = fecha.timetuple().tm_yday
 
 # Cargar TMY opcional (mostrar progreso al descargar)
-tmy_df = None
+# Añadir botón para forzar actualización y usar caché para evitar descargas repetidas
+if 'tmy_requested' not in st.session_state:
+    st.session_state['tmy_requested'] = False
+
+with st.sidebar:
+    if st.button('Actualizar/Descargar TMY ahora'):
+        st.session_state['tmy_requested'] = True
+        # Limpiar caché de datos para forzar nueva descarga
+        try:
+            st.cache_data.clear()
+        except Exception:
+            pass
+        st.experimental_rerun()
+
+
+@st.cache_data(ttl=24*3600)
+def cached_load_tmy_with_retries(attempts: int = 3, wait_s: float = 1.0):
+    """Wrapper cached que intenta descargar/cargar TMY varias veces."""
+    for i in range(attempts):
+        try:
+            df = load_tmy()
+            if df is not None:
+                return df
+        except Exception:
+            df = None
+        # esperar antes del siguiente intento (pequeño backoff)
+        time.sleep(wait_s * (i + 1))
+    return None
+
+
 with st.spinner('Comprobando TMY local y descargando desde NASA POWER si es necesario...'):
     try:
-        tmy_df = load_tmy()
+        tmy_df = cached_load_tmy_with_retries()
     except Exception as e:
         tmy_df = None
         st.error(f"Error al intentar cargar/descargar TMY: {e}")
